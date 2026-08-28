@@ -5,37 +5,25 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>费用规划助手</title>
 <style>
-:root{--nav:#0d1b2a;--bg:#f4f6fa;--panel:#fff;--line:#dbe3ef;--text:#142033;--muted:#6b7688;--blue:#1769ff;--ok:#0b8f55;--warn:#a86900}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif}.layout{display:grid;grid-template-columns:210px 1fr;min-height:100vh}.side{background:var(--nav);color:#fff;padding:22px 18px}.side h1{font-size:18px;margin:0 0 4px}.side p{font-size:12px;color:#b7c3d5;margin:0 0 30px}.step{padding:10px 12px;border-radius:9px;margin:7px 0;color:#c9d4e5}.step.active{background:#17365c;color:#fff}.main{padding:26px 28px}.head h2{font-size:24px;margin:0 0 4px}.head p{color:var(--muted);margin:0 0 20px}.notice{padding:12px 14px;border:1px solid #cfe0ff;background:#eef5ff;border-radius:10px;margin-bottom:18px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:0 2px 9px rgba(21,38,68,.04)}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.file{border:1px dashed #b9c8dd;border-radius:12px;padding:14px}.file b{display:block;margin-bottom:5px}.file small{display:block;color:var(--muted);margin-bottom:10px}.file input{width:100%}.row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}.field label{display:block;font-weight:600;margin-bottom:6px}.field input{width:100%;border:1px solid #cfd8e6;border-radius:9px;padding:10px}.actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}.btn{border:0;background:var(--blue);color:#fff;padding:11px 18px;border-radius:9px;font-weight:600;cursor:pointer}.foot{color:var(--muted);font-size:12px;margin-top:14px}@media(max-width:850px){.layout{grid-template-columns:1fr}.side{display:none}.grid,.row{grid-template-columns:1fr}.main{padding:18px}}
+:root{--nav:#0d1b2a;--bg:#f4f6fa;--panel:#fff;--line:#dbe3ef;--text:#142033;--muted:#6b7688;--blue:#1769ff}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif}.layout{display:grid;grid-template-columns:210px 1fr;min-height:100vh}.side{background:var(--nav);color:#fff;padding:22px 18px}.side h1{font-size:18px;margin:0 0 4px}.side p{font-size:12px;color:#b7c3d5;margin:0 0 30px}.step{padding:10px 12px;border-radius:9px;margin:7px 0;color:#c9d4e5}.step.active{background:#17365c;color:#fff}.main{padding:26px 28px}.head h2{font-size:24px;margin:0 0 4px}.head p{color:var(--muted);margin:0 0 20px}.notice{padding:12px 14px;border:1px solid #cfe0ff;background:#eef5ff;border-radius:10px;margin-bottom:18px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.file{border:1px dashed #b9c8dd;border-radius:12px;padding:14px}.file b{display:block;margin-bottom:5px}.file small{display:block;color:var(--muted);margin-bottom:10px}.file input{width:100%}.row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}.field label{display:block;font-weight:600;margin-bottom:6px}.field input{width:100%;border:1px solid #cfd8e6;border-radius:9px;padding:10px}.actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}.btn{border:0;background:var(--blue);color:#fff;padding:11px 18px;border-radius:9px;font-weight:600;cursor:pointer}.foot{color:var(--muted);font-size:12px;margin-top:14px}@media(max-width:850px){.layout{grid-template-columns:1fr}.side{display:none}.grid,.row{grid-template-columns:1fr}.main{padding:18px}}
 </style>
 </head>
 <body>
 <div class="layout">
-  <aside class="side">
-    <h1>费用规划助手</h1><p>Netlify 后端版 · 浏览器只负责上传与展示</p>
-    <div class="step active">1 数据更新</div>
-    <div class="step">2 CP范围</div>
-    <div class="step">3 承载 / 拍板</div>
-    <div class="step">4 计划输出</div>
-  </aside>
-  <main class="main">
-    <div class="head"><h2>数据更新</h2><p>BI + TTS + CP预算 + 产品目录 → 服务端解析 → 承载候选</p></div>
-    <div class="notice">本版核心流程不依赖前端 JavaScript。文件只用于本次请求计算，程序不写数据库、不做持久化。</div>
-    <form class="panel" action="/analyze" method="post" enctype="multipart/form-data">
-      <div class="grid">
-        <div class="file"><b>BI</b><small>读取 BI-SO(折扣)、BI-Stock、SKU/产品信息。</small><input required type="file" name="bi" accept=".xlsx,.xlsm,.xls" /></div>
-        <div class="file"><b>TTS 最新下载</b><small>读取历史折扣计划与同月重叠占用。</small><input required type="file" name="tts" accept=".xlsx,.xlsm,.xls" /></div>
-        <div class="file"><b>CP预算</b><small>读取 CP余额、有效期、渠道、Activity Mechanism。</small><input required type="file" name="cp" accept=".xlsx,.xlsm,.xls" /></div>
-        <div class="file"><b>产品目录 / 指导价</b><small>读取 SKU、产品描述、NPS未税箱价。</small><input required type="file" name="product" accept=".xlsx,.xlsm,.xls" /></div>
-      </div>
-      <div class="row">
-        <div class="field"><label>重点客户关键词</label><input name="focus" placeholder="可留空；多个客户用逗号分隔" /></div>
-        <div class="field"><label>最小展示CP余额</label><input name="minBalance" type="number" value="500" min="0" step="100" /></div>
-      </div>
-      <div class="actions"><button class="btn" type="submit">上传并计算</button></div>
-      <div class="foot">当前限制：单次上传建议控制在约 5MB 内；计算结果页面会标明哪些为实际、哪些为预测或需人工判断。</div>
-    </form>
-  </main>
+<aside class="side"><h1>费用规划助手</h1><p>Netlify 后端版</p><div class="step active">1 数据更新</div><div class="step">2 CP范围</div><div class="step">3 承载 / 拍板</div><div class="step">4 计划输出</div></aside>
+<main class="main">
+<div class="head"><h2>数据更新</h2><p>BI + TTS + CP预算 + 产品目录 → 服务端解析 → 承载候选</p></div>
+<div class="notice">当前先验收承载准确性。核心流程不依赖前端 JavaScript；文件仅用于本次请求计算，不写数据库。</div>
+<form class="panel" action="/analyze2" method="post" enctype="multipart/form-data">
+<div class="grid">
+<div class="file"><b>BI</b><small>BI-SO(折扣)、BI-Stock、SKURate、产品目录。</small><input required type="file" name="bi" accept=".xlsx,.xlsm,.xls" /></div>
+<div class="file"><b>TTS 最新下载</b><small>读取折扣计划、重叠费率和回溯备注日期。</small><input required type="file" name="tts" accept=".xlsx,.xlsm,.xls" /></div>
+<div class="file"><b>CP预算</b><small>读取余额、有效期、MG1、渠道、机制。</small><input required type="file" name="cp" accept=".xlsx,.xlsm,.xls" /></div>
+<div class="file"><b>产品目录 / 指导价</b><small>读取 SKU、产品描述、NPS未税箱价。</small><input required type="file" name="product" accept=".xlsx,.xlsm,.xls" /></div>
 </div>
-</body>
-</html>
+<div class="row"><div class="field"><label>重点客户关键词</label><input name="focus" placeholder="建议先填：亚泰轩,天虹,东方,椰冬,欣旺" /></div><div class="field"><label>最小展示CP余额</label><input name="minBalance" type="number" value="500" min="0" step="100" /></div></div>
+<div class="actions"><button class="btn" type="submit">上传并计算</button></div>
+<div class="foot">当前四个文件合计约3MB，适合此服务端上传方式。结果会分开显示历史HARD、本月预测和9月SOFT。</div>
+</form>
+</main></div>
+</body></html>
