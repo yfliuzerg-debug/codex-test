@@ -13,8 +13,8 @@
 <aside class="side"><h1>费用规划助手</h1><p>Netlify 后端版</p><div class="step active">1 数据更新</div><div class="step">2 CP范围</div><div class="step">3 承载 / 拍板</div><div class="step">4 计划输出</div></aside>
 <main class="main">
 <div class="head"><h2>数据更新</h2><p>BI + TTS + CP预算 + 产品目录 → 服务端解析 → 承载候选</p></div>
-<div class="notice">当前先验收承载准确性。核心流程不依赖前端 JavaScript；文件仅用于本次请求计算，不写数据库。</div>
-<form class="panel" action="/analyze2" method="post" enctype="multipart/form-data">
+<div class="notice">当前先验收承载准确性。新版会显示四个文件指纹和逐月结果，方便与人工基线逐项对账。</div>
+<form class="panel" action="/analyze3" method="post" enctype="multipart/form-data">
 <div class="grid">
 <div class="file"><b>BI</b><small>BI-SO(折扣)、BI-Stock、SKURate、产品目录。</small><input required type="file" name="bi" accept=".xlsx,.xlsm,.xls" /></div>
 <div class="file"><b>TTS 最新下载</b><small>读取折扣计划、重叠费率和回溯备注日期。</small><input required type="file" name="tts" accept=".xlsx,.xlsm,.xls" /></div>
@@ -23,7 +23,7 @@
 </div>
 <div class="row"><div class="field"><label>重点客户关键词</label><input name="focus" placeholder="建议先填：亚泰轩,天虹,东方,椰冬,欣旺" /></div><div class="field"><label>最小展示CP余额</label><input name="minBalance" type="number" value="500" min="0" step="100" /></div></div>
 <div class="actions"><button class="btn" type="submit">上传并计算</button></div>
-<div class="foot">当前四个文件合计约3MB，适合此服务端上传方式。结果会分开显示历史HARD、本月预测和9月SOFT。</div>
+<div class="foot">结果会分开显示历史HARD、本月预测、9月SOFT，并展开各月份净坑位与重叠扣减。</div>
 </form>
 </main></div>
 </body></html>
