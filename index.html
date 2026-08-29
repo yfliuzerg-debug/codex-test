@@ -13,17 +13,17 @@
 <aside class="side"><h1>费用规划助手</h1><p>Netlify 后端版</p><div class="step active">1 数据更新</div><div class="step">2 CP范围</div><div class="step">3 承载 / 拍板</div><div class="step">4 计划输出</div></aside>
 <main class="main">
 <div class="head"><h2>数据更新</h2><p>BI + TTS + CP预算 + 产品目录 → 服务端解析 → 承载候选</p></div>
-<div class="notice">当前先验收承载准确性。新版会显示四个文件指纹和逐月结果，方便与人工基线逐项对账。</div>
-<form class="panel" action="/analyze3" method="post" enctype="multipart/form-data">
+<div class="notice">当前先验收承载准确性。结果会校验四个文件指纹，并把历史HARD、本月已实现、本月预测和未来SOFT分开。</div>
+<form class="panel" action="/analyze4" method="post" enctype="multipart/form-data">
 <div class="grid">
 <div class="file"><b>BI</b><small>BI-SO(折扣)、BI-Stock、SKURate、产品目录。</small><input required type="file" name="bi" accept=".xlsx,.xlsm,.xls" /></div>
-<div class="file"><b>TTS 最新下载</b><small>读取折扣计划、重叠费率和回溯备注日期。</small><input required type="file" name="tts" accept=".xlsx,.xlsm,.xls" /></div>
+<div class="file"><b>TTS 最新下载</b><small>读取同CP既有计划、重叠费率和回溯备注日期。</small><input required type="file" name="tts" accept=".xlsx,.xlsm,.xls" /></div>
 <div class="file"><b>CP预算</b><small>读取余额、有效期、MG1、渠道、机制。</small><input required type="file" name="cp" accept=".xlsx,.xlsm,.xls" /></div>
 <div class="file"><b>产品目录 / 指导价</b><small>读取 SKU、产品描述、NPS未税箱价。</small><input required type="file" name="product" accept=".xlsx,.xlsm,.xls" /></div>
 </div>
 <div class="row"><div class="field"><label>重点客户关键词</label><input name="focus" placeholder="建议先填：亚泰轩,天虹,东方,椰冬,欣旺" /></div><div class="field"><label>最小展示CP余额</label><input name="minBalance" type="number" value="500" min="0" step="100" /></div></div>
 <div class="actions"><button class="btn" type="submit">上传并计算</button></div>
-<div class="foot">结果会分开显示历史HARD、本月预测、9月SOFT，并展开各月份净坑位与重叠扣减。</div>
+<div class="foot">东方 × DA202602017 当前验收基线：4月7,341 / 5月5,094 / 6月4,383 / 7月460&lt;500 / 8月已实现799。</div>
 </form>
 </main></div>
 </body></html>
