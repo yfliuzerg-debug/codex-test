@@ -1,0 +1,1 @@
+export default function onRequest(){return Response.json({ok:true,platform:"edgeone-pages-node-functions",time:new Date().toISOString()},{headers:{"cache-control":"no-store"}})}
