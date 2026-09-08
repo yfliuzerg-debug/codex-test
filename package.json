@@ -6,6 +6,7 @@
     "build": "node -e \"console.log('static build')\""
   },
   "dependencies": {
+    "@netlify/blobs": "^10.0.10",
     "@netlify/functions": "^3.1.10",
     "xlsx": "^0.18.5"
   },
