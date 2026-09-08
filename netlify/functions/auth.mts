@@ -1,0 +1,30 @@
+import type { Config, Context } from "@netlify/functions";
+import { clearSessionCookie, createSessionCookie, isAuthorized, passwordMatches } from "./_shared/auth.mts";
+
+const esc=(v:any)=>String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+
+function loginPage(message=""){
+  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>费用规划助手</title><style>body{margin:0;background:#f4f6fa;color:#142033;font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif}.box{width:min(430px,calc(100% - 32px));margin:14vh auto;background:#fff;border:1px solid #dbe3ef;border-radius:16px;padding:26px}.muted{color:#6b7688}.warn{background:#fff3e8;border:1px solid #f0cda5;border-radius:8px;padding:9px;margin:12px 0}.field{width:100%;padding:11px;border:1px solid #cfd8e6;border-radius:9px;margin:10px 0 14px}.btn{width:100%;border:0;background:#1769ff;color:#fff;padding:11px;border-radius:9px;font-weight:600}</style></head><body><div class="box"><h2 style="margin:0 0 6px">费用规划助手</h2><div class="muted">仅限授权同事使用</div>${message?`<div class="warn">${esc(message)}</div>`:""}<form action="/auth" method="post"><input class="field" type="password" name="password" autocomplete="current-password" placeholder="共享密码" required autofocus><button class="btn" type="submit">进入</button></form></div></body></html>`;
+}
+
+function workspace(){
+  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>费用规划助手</title><style>:root{--nav:#0d1b2a;--bg:#f4f6fa;--panel:#fff;--line:#dbe3ef;--text:#142033;--muted:#6b7688;--blue:#1769ff}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif}.layout{display:grid;grid-template-columns:210px 1fr;min-height:100vh}.side{background:var(--nav);color:#fff;padding:22px 18px}.side h1{font-size:18px;margin:0 0 4px}.side p{font-size:12px;color:#b7c3d5;margin:0 0 30px}.step{padding:10px 12px;border-radius:9px;margin:7px 0;color:#c9d4e5}.step.active{background:#17365c;color:#fff}.main{padding:26px 28px}.head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.head h2{font-size:24px;margin:0 0 4px}.head p{color:var(--muted);margin:0 0 20px}.head a{color:#1769ff;text-decoration:none}.notice{padding:12px 14px;border:1px solid #cfe0ff;background:#eef5ff;border-radius:10px;margin-bottom:18px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.file{border:1px dashed #b9c8dd;border-radius:12px;padding:14px}.file b{display:block;margin-bottom:5px}.file small{display:block;color:var(--muted);margin-bottom:10px}.file input{width:100%}.row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}.field label{display:block;font-weight:600;margin-bottom:6px}.field input{width:100%;border:1px solid #cfd8e6;border-radius:9px;padding:10px}.actions{display:flex;justify-content:flex-end;margin-top:16px}.btn{border:0;background:var(--blue);color:#fff;padding:11px 18px;border-radius:9px;font-weight:600}.foot{color:var(--muted);font-size:12px;margin-top:14px}@media(max-width:850px){.layout{grid-template-columns:1fr}.side{display:none}.grid,.row{grid-template-columns:1fr}.main{padding:18px}}</style></head><body><div class="layout"><aside class="side"><h1>费用规划助手</h1><p>双人共享 · 服务端计算</p><div class="step active">1 数据更新</div><div class="step">2 CP范围</div><div class="step">3 承载 / 拍板</div><div class="step">4 计划输出</div></aside><main class="main"><div class="head"><div><h2>数据更新</h2><p>BI + TTS + CP预算 + 产品目录 → 服务端解析 → 承载候选 → Overlay下载</p></div><a href="/logout">退出</a></div><div class="notice">登录有效期8小时。上传文件只用于本次请求计算，不写数据库；分析结果下载缓存为一次性令牌。</div><form class="panel" action="/analyze6" method="post" enctype="multipart/form-data"><div class="grid"><div class="file"><b>BI</b><small>BI-SO(折扣)、BI-Stock、SKURate、产品目录。</small><input required type="file" name="bi" accept=".xlsx,.xlsm,.xls"></div><div class="file"><b>TTS 最新下载</b><small>读取同CP既有计划、重叠费率和回溯备注日期。</small><input required type="file" name="tts" accept=".xlsx,.xlsm,.xls"></div><div class="file"><b>CP预算</b><small>读取余额、有效期、MG1、渠道、机制。</small><input required type="file" name="cp" accept=".xlsx,.xlsm,.xls"></div><div class="file"><b>产品目录 / 指导价</b><small>读取 SKU、产品描述、NPS未税箱价。</small><input required type="file" name="product" accept=".xlsx,.xlsm,.xls"></div></div><div class="row"><div class="field"><label>重点客户关键词</label><input name="focus" placeholder="可留空；多个客户用逗号分隔"></div><div class="field"><label>最小展示CP余额</label><input name="minBalance" type="number" value="500" min="0" step="100"></div></div><div class="actions"><button class="btn" type="submit">上传并计算</button></div><div class="foot">结果页可下载分析结果.xlsx，供其他对话继续做 Overlay。</div></form></main></div></body></html>`;
+}
+
+export default async(req:Request,context:Context)=>{
+  const path=new URL(req.url).pathname;
+  if(path==="/auth"&&req.method==="POST"){
+    const form=await req.formData();
+    const password=String(form.get("password")??"");
+    if(!passwordMatches(password)) return new Response(loginPage("密码不正确"),{status:401,headers:{"content-type":"text/html;charset=utf-8","cache-control":"no-store"}});
+    return new Response(null,{status:303,headers:{location:"/workspace","set-cookie":createSessionCookie(),"cache-control":"no-store"}});
+  }
+  if(path==="/logout") return new Response(null,{status:303,headers:{location:"/","set-cookie":clearSessionCookie(),"cache-control":"no-store"}});
+  if(path==="/workspace"){
+    if(!isAuthorized(req)) return new Response(null,{status:303,headers:{location:"/"}});
+    return new Response(workspace(),{headers:{"content-type":"text/html;charset=utf-8","cache-control":"no-store"}});
+  }
+  return new Response("Not Found",{status:404});
+};
+
+export const config:Config={path:["/auth","/workspace","/logout"]};
