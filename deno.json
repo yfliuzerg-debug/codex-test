@@ -1,0 +1,13 @@
+{
+  "imports": {
+    "xlsx": "npm:xlsx@0.18.5"
+  },
+  "nodeModulesDir": "auto",
+  "deploy": {
+    "runtime": {
+      "type": "dynamic",
+      "entrypoint": "./deno_main.ts",
+      "memory_limit": 768
+    }
+  }
+}
