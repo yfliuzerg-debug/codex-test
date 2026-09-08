@@ -1,0 +1,9 @@
+{
+  "name": "expense-planner",
+  "installCommand": "npm install",
+  "outputDirectory": ".",
+  "nodeVersion": "22.11.0",
+  "nodeFunctionsConfig": {
+    "maxDuration": 120
+  }
+}
