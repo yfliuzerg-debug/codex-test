@@ -62,6 +62,179 @@ function passwordMatches(value: string) {
   return diff === 0;
 }
 
+function expandSheetRef(ws: any) {
+  let maxR = 0;
+  let maxC = 0;
+  let seen = false;
+  for (const k of Object.keys(ws || {})) {
+    if (k.startsWith("!")) continue;
+    const m = k.match(/^([A-Z]+)(\d+)$/);
+    if (!m) continue;
+    maxC = Math.max(maxC, XLSX.utils.decode_col(m[1]));
+    maxR = Math.max(maxR, Number(m[2]) - 1);
+    seen = true;
+  }
+  if (seen) ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: maxR, c: maxC } });
+}
+
+function sheetRows(wb: any, name: string) {
+  const ws = wb?.Sheets?.[name];
+  if (!ws) return [] as any[][];
+  expandSheetRef(ws);
+  return XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, raw: true }) as any[][];
+}
+
+function findHeader(rs: any[][], need: string[]) {
+  return rs.findIndex((r) => need.every((k) => r.some((c) => String(c ?? "").trim() === k)));
+}
+
+function headerMap(h: any[]) {
+  const out: Record<string, number> = {};
+  h.forEach((v, i) => {
+    if (v != null) out[String(v).trim()] = i;
+  });
+  return out;
+}
+
+function productGroupCode(v: unknown) {
+  const s = String(v ?? "").trim();
+  return /^[A-Za-z0-9]{2,8}$/.test(s) ? s : "";
+}
+
+function attachProductGroupCodes(r: any) {
+  const wb = r?.packs?.[0]?.wb;
+  if (!wb || !wb.SheetNames?.includes("BI-SO(折扣)")) return;
+  const rs = sheetRows(wb, "BI-SO(折扣)");
+  const hi = findHeader(rs, ["Brand Name", "SKU"]);
+  if (hi < 0) return;
+  const h = rs[hi].map((v) => String(v ?? "").trim());
+  const x = headerMap(h);
+  const brandIdx = x["Brand Name"];
+  const skuIdx = x["SKU"];
+  if (!Number.isInteger(brandIdx) || !Number.isInteger(skuIdx) || brandIdx <= 0) return;
+
+  // 当前 BI 中产品组编码（如 OHZ / O04）固定紧邻 Brand Name 左侧；用户已确认该编码与 Brand 一一对应。
+  const codeIdx = brandIdx - 1;
+  const bySku = new Map<string, string>();
+  const byBrand = new Map<string, string>();
+  for (const row of rs.slice(hi + 1)) {
+    const sku = String(row[skuIdx] ?? "").trim();
+    const brand = String(row[brandIdx] ?? "").trim();
+    const code = productGroupCode(row[codeIdx]);
+    if (!code) continue;
+    if (sku && !bySku.has(sku)) bySku.set(sku, code);
+    if (brand && !byBrand.has(brand)) byBrand.set(brand, code);
+  }
+  for (const s of r.so || []) {
+    const sku = String(s.sku || "");
+    const brand = String(s.brand || "");
+    s.productGroupCode = bySku.get(sku) || byBrand.get(brand) || "";
+  }
+}
+
+function keepCapacityRow(x: any) {
+  const vals = [x?.["净承载"], x?.["预测承载"], x?.["计入可见承载"]];
+  // 只过滤三个承载字段都明确为 0 的行；费率未知导致的 null 行继续保留。
+  return vals.some((v) => v == null || Number(v) !== 0);
+}
+
+function planningClientRows(r: any) {
+  const meta = new Map<string, any>();
+  for (const s of r.so || []) {
+    const sku = String(s.sku || "");
+    if (!sku) continue;
+    const old = meta.get(sku) || {};
+    meta.set(sku, {
+      brand: old.brand || String(s.brand || ""),
+      s1: old.s1 || String(s.s1 || ""),
+      s2: old.s2 || String(s.s2 || ""),
+      s3: old.s3 || String(s.s3 || ""),
+      productName: old.productName || String(s.skuName || ""),
+      productGroupCode: old.productGroupCode || String(s.productGroupCode || ""),
+    });
+  }
+  return (r.exportRows || []).filter(keepCapacityRow).map((x: any) => {
+    const sku = String(x.SKU || "");
+    const m = meta.get(sku) || {};
+    return {
+      customer: String(x["经销商/客户"] || ""),
+      customerCode: String(x["客户编码"] || ""),
+      cp: String(x.CP || ""),
+      activity: String(x["活动"] || ""),
+      channel: String(x["渠道"] || ""),
+      brand: String(x["品牌"] || m.brand || ""),
+      s1: String(m.s1 || ""),
+      s2: String(m.s2 || ""),
+      s3: String(m.s3 || ""),
+      productGroupCode: String(m.productGroupCode || ""),
+      sku,
+      productName: String(x["产品名称"] || m.productName || ""),
+      month: String(x["月份"] || ""),
+      visibleCapacity: x["计入可见承载"] == null ? null : Number(x["计入可见承载"]),
+    };
+  });
+}
+
+function renderPlanningAddon(r: any) {
+  const rows = JSON.stringify(planningClientRows(r)).replace(/</g, "\\u003c").replace(/-->/g, "--\\>");
+  return `<style>
+.rf-plan table{min-width:1050px}.rf-plan .v4-total td{font-weight:700;background:#f8fafc}.rf-plan .v4-pg{min-width:220px}.rf-detail.v4-collapsed table{display:none}.v4-detail-toggle{border:1px solid #cfd8e6;background:#fff;color:#1769ff;border-radius:8px;padding:6px 10px;cursor:pointer}.v4-plan-note{margin-top:3px}.v4-plan-count{white-space:nowrap}
+</style>
+<script>
+(function(){
+  var V=${rows};
+  var fmt=new Intl.NumberFormat("zh-CN",{maximumFractionDigits:0});
+  function money(v){return fmt.format(Number(v)||0)}
+  function cmp(a,b){return String(a).localeCompare(String(b),"zh-CN",{numeric:true})}
+  function mlabel(v){return /^20\\d{4}$/.test(v)?Number(v.slice(4))+"月":v}
+  function uniq(a){return Array.from(new Set(a.filter(function(v){return String(v||"")!==""}))).sort(cmp)}
+  function selectedValues(id){return new Set(Array.from(document.querySelectorAll("#"+id+" input:checked")).map(function(i){return i.value}).filter(function(v){return v&&v!=="on"}))}
+  function selectedMonthLabels(){return new Set(Array.from(document.querySelectorAll("#fMonth .rf-month.on span")).map(function(x){return String(x.textContent||"").trim()}))}
+  function levelKey(){var t=document.querySelector("#groupLevels label.on span");var v=String(t&&t.textContent||"S3").toLowerCase();return v==="brand"?"brand":v==="s1"?"s1":v==="s2"?"s2":"s3"}
+  function filtered(){
+    var c=selectedValues("fCustomer"),cc=selectedValues("fCode"),cp=selectedValues("fCP"),ch=selectedValues("fChannel"),br=selectedValues("fBrand"),sku=selectedValues("fSKU"),gr=selectedValues("fGroup"),mo=selectedMonthLabels(),lk=levelKey();
+    return V.filter(function(r){
+      if(c.size&&!c.has(r.customer))return false;
+      if(cc.size&&!cc.has(r.customerCode))return false;
+      if(cp.size&&!cp.has(r.cp))return false;
+      if(ch.size&&!ch.has(r.channel))return false;
+      if(br.size&&!br.has(r.brand))return false;
+      if(sku.size&&!sku.has(r.sku))return false;
+      if(gr.size&&!gr.has(String(r[lk]||"")))return false;
+      if(mo.size&&!mo.has(mlabel(r.month)))return false;
+      return true;
+    });
+  }
+  function groupText(r){var g=String(r[levelKey()]||"");return [String(r.productGroupCode||""),g].filter(Boolean).join("｜")}
+  function groupCodeMap(){var lk=levelKey(),m=new Map();V.forEach(function(r){var g=String(r[lk]||""),c=String(r.productGroupCode||"");if(!g||!c)return;if(!m.has(g))m.set(g,new Set());m.get(g).add(c)});return m}
+  function refreshGroupLabels(){var m=groupCodeMap();document.querySelectorAll("#fGroup .rf-opt").forEach(function(l){var i=l.querySelector("input"),s=l.querySelector("span");if(!i||!s)return;var base=String(i.value||"");var codes=m.get(base);var pre=codes&&codes.size?Array.from(codes).sort(cmp).join("/")+"｜":"";var next=pre+base;if(s.textContent!==next)s.textContent=next})}
+  function refreshDetailGroups(){var skuCode=new Map();V.forEach(function(r){if(r.sku&&r.productGroupCode&&!skuCode.has(r.sku))skuCode.set(r.sku,r.productGroupCode)});document.querySelectorAll("#detailBody tr").forEach(function(tr){var cells=tr.children;if(cells.length<5)return;var sku=String(cells[4].textContent||"").split("｜")[0].trim();var code=skuCode.get(sku)||"";var cell=cells[3];var base=cell.getAttribute("data-v4-base");if(base==null){base=String(cell.textContent||"");cell.setAttribute("data-v4-base",base)}var next=[code,base].filter(Boolean).join("｜");if(cell.textContent!==next)cell.textContent=next})}
+  function planData(){
+    var rows=filtered(),months=uniq(rows.map(function(r){return r.month})),m=new Map();
+    rows.forEach(function(r){var g=String(r[levelKey()]||""),k=[r.customer,r.customerCode,r.cp,r.channel,r.productGroupCode,g].join("\\u241e"),x=m.get(k);if(!x){x={customer:r.customer,customerCode:r.customerCode,activity:[r.cp,r.activity].filter(Boolean).join("｜"),channel:r.channel,group:groupText(r),values:{}};m.set(k,x)}x.values[r.month]=(x.values[r.month]||0)+(Number(r.visibleCapacity)||0)});
+    var out=Array.from(m.values()).filter(function(x){return months.some(function(mm){return Number(x.values[mm]||0)!==0})}).sort(function(a,b){return cmp(a.customer,b.customer)||cmp(a.channel,b.channel)||cmp(a.group,b.group)});
+    return {months:months,rows:out};
+  }
+  function renderPlan(){
+    var p=planData(),head=document.getElementById("v4PlanHead"),body=document.getElementById("v4PlanBody"),count=document.getElementById("v4PlanCount");if(!head||!body)return;head.textContent="";body.textContent="";
+    var hr=document.createElement("tr");["客户","活动","渠道","产品组"].forEach(function(t){var th=document.createElement("th");th.textContent=t;hr.appendChild(th)});p.months.forEach(function(mm){var th=document.createElement("th");th.className="num";th.textContent=mlabel(mm);hr.appendChild(th)});var th=document.createElement("th");th.className="num";th.textContent="合计";hr.appendChild(th);head.appendChild(hr);
+    var totals={};p.months.forEach(function(mm){totals[mm]=0});var grand=0;
+    p.rows.forEach(function(g){var tr=document.createElement("tr"),td=document.createElement("td"),n=document.createElement("div"),c=document.createElement("span");n.textContent=g.customer;c.className="rf-sub";c.textContent=g.customerCode;td.appendChild(n);td.appendChild(c);tr.appendChild(td);[g.activity,g.channel,g.group].forEach(function(v,idx){var x=document.createElement("td");x.textContent=v;if(idx===2)x.className="v4-pg";tr.appendChild(x)});var rowTotal=0;p.months.forEach(function(mm){var v=Number(g.values[mm]||0);rowTotal+=v;totals[mm]+=v;var x=document.createElement("td");x.className="num";x.textContent=money(v);tr.appendChild(x)});grand+=rowTotal;var z=document.createElement("td");z.className="num";z.style.fontWeight="700";z.textContent=money(rowTotal);tr.appendChild(z);body.appendChild(tr)});
+    if(p.rows.length){var tr=document.createElement("tr");tr.className="v4-total";var x=document.createElement("td");x.colSpan=4;x.textContent="合计";tr.appendChild(x);p.months.forEach(function(mm){var z=document.createElement("td");z.className="num";z.textContent=money(totals[mm]);tr.appendChild(z)});var z=document.createElement("td");z.className="num";z.textContent=money(grand);tr.appendChild(z);body.appendChild(tr)}else{var tr=document.createElement("tr"),x=document.createElement("td");x.colSpan=5+p.months.length;x.className="rf-empty";x.textContent="当前筛选没有可用于计划的可见承载";tr.appendChild(x);body.appendChild(tr)}if(count)count.textContent=p.rows.length+" 行";
+  }
+  var detail=document.querySelector(".rf-detail");
+  if(detail){
+    var plan=document.createElement("div");plan.className="p rf-table rf-plan";plan.innerHTML='<div class="rf-bar"><div><h3>计划汇总</h3><div class="muted v4-plan-note">按客户 × 活动 × 渠道 × 产品组汇总可见承载；产品组固定带 Brand 对应编码。</div></div><div class="muted v4-plan-count" id="v4PlanCount"></div></div><table><thead id="v4PlanHead"></thead><tbody id="v4PlanBody"></tbody></table>';detail.parentNode.insertBefore(plan,detail);
+    detail.classList.add("v4-collapsed");var bar=detail.querySelector(".rf-bar"),btn=document.createElement("button");btn.type="button";btn.className="v4-detail-toggle";btn.textContent="展开 SKU 明细";btn.onclick=function(){var c=detail.classList.toggle("v4-collapsed");btn.textContent=c?"展开 SKU 明细":"收起 SKU 明细"};if(bar)bar.appendChild(btn);
+  }
+  function refresh(){refreshGroupLabels();refreshDetailGroups();renderPlan()}
+  var panel=document.getElementById("rfPanel");if(panel){panel.addEventListener("change",function(){setTimeout(refresh,0)},true);panel.addEventListener("click",function(e){var t=e.target;if(t&&t.id==="rfReset")setTimeout(refresh,0)},true)}
+  var target=document.getElementById("fGroup"),detailBody=document.getElementById("detailBody");var obs=new MutationObserver(function(){refreshGroupLabels();refreshDetailGroups()});if(target)obs.observe(target,{childList:true,subtree:true});if(detailBody)obs.observe(detailBody,{childList:true,subtree:true});
+  refresh();
+})();
+</script>`;
+}
+
 function loginPage(message = "") {
   return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>费用规划助手</title><style>body{margin:0;background:#f4f6fa;color:#142033;font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif}.box{width:min(430px,calc(100% - 32px));margin:14vh auto;background:#fff;border:1px solid #dbe3ef;border-radius:16px;padding:26px}.muted{color:#6b7688}.warn{background:#fff3e8;border:1px solid #f0cda5;border-radius:8px;padding:9px;margin:12px 0}.field{width:100%;box-sizing:border-box;padding:11px;border:1px solid #cfd8e6;border-radius:9px;margin:10px 0 14px}.btn{width:100%;border:0;background:#1769ff;color:#fff;padding:11px;border-radius:9px;font-weight:600}</style></head><body><div class="box"><h2 style="margin:0 0 6px">费用规划助手</h2><div class="muted">仅限授权同事使用 · Deno Deploy</div>${message ? `<div class="warn">${esc(message)}</div>` : ""}<form action="/auth" method="post"><input class="field" type="password" name="password" autocomplete="current-password" placeholder="共享密码" required autofocus><button class="btn" type="submit">进入</button></form></div></body></html>`;
 }
@@ -86,7 +259,7 @@ function filePanel(r: AnalysisResult) {
 
 function exportPayload(r: AnalysisResult) {
   return {
-    version: "2026-09-deno-v3",
+    version: "2026-09-deno-v4",
     generatedAt: r.generatedAt,
     currentMonth: r.currentMonth,
     overlayRows: r.exportRows,
@@ -187,8 +360,9 @@ async function takeDownload(token: string) {
 
 function renderResult(r: AnalysisResult, token = "", downloadError = "") {
   const cards = `<div class="cards"><div class="card"><span>BI SO行</span><b>${money(r.so.length)}</b></div><div class="card"><span>库存行</span><b>${money(r.stock.length)}</b></div><div class="card"><span>SKU Rate有效/原始</span><b>${money(r.rateInfo.valid.length)} / ${money(r.rateInfo.raw)}</b></div><div class="card"><span>TTS有效折扣行</span><b>${money(r.tts.length)}</b></div><div class="card"><span>可用CP</span><b>${money(r.active.length)}</b></div><div class="card"><span>目录SKU</span><b>${money(r.prices.size)}</b></div></div>`;
-  const note = `<div class="ok">一次计算后的筛选在浏览器本地执行；当前筛选结果可直接导出 xlsx，不依赖 Deno KV。</div>${downloadError ? `<div class="warn">完整分析结果下载缓存未建立：${esc(downloadError)}。不影响筛选与“导出筛选结果.xlsx”。</div>` : ""}`;
-  return page("费用规划助手｜承载结果", filePanel(r) + cards + note + renderFilterDashboard(r), token);
+  const note = `<div class="ok">一次计算后的筛选在浏览器本地执行；三个承载字段都为 0 的明细已自动隐藏；计划汇总按客户 × 活动 × 渠道 × 产品组展示分月可见承载。</div>${downloadError ? `<div class="warn">完整分析结果下载缓存未建立：${esc(downloadError)}。不影响筛选与“导出筛选结果.xlsx”。</div>` : ""}`;
+  const ui = { ...r, exportRows: (r.exportRows || []).filter(keepCapacityRow) } as AnalysisResult;
+  return page("费用规划助手｜承载结果", filePanel(r) + cards + note + renderFilterDashboard(ui) + renderPlanningAddon(ui), token);
 }
 
 async function handler(req: Request) {
@@ -215,6 +389,7 @@ async function handler(req: Request) {
       const bi = f.get("bi"), tts = f.get("tts"), cp = f.get("cp"), product = f.get("product");
       if (!(bi instanceof File) || !(tts instanceof File) || !(cp instanceof File) || !(product instanceof File)) return new Response(page("文件不完整", '<div class="warn">四个文件都必须上传。</div>'), { status: 400, headers: { "content-type": "text/html;charset=utf-8" } });
       const r = await analyzeFiles({ bi, ttsFile: tts, cpFile: cp, product, focus: String(f.get("focus") ?? ""), minBalance: Number(f.get("minBalance") ?? 500) });
+      attachProductGroupCodes(r);
       let token = ""; let downloadError = "";
       try { token = await saveDownload(buildWorkbook(exportPayload(r))); } catch (e) { downloadError = e instanceof Error ? e.message : String(e); }
       return new Response(renderResult(r, token, downloadError), { headers: { "content-type": "text/html;charset=utf-8", "cache-control": "no-store" } });
@@ -244,7 +419,7 @@ async function handler(req: Request) {
     return new Response(result.bytes, { headers: { "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "content-disposition": `attachment; filename*=UTF-8''${encodeURIComponent(result.filename)}`, "cache-control": "no-store" } });
   }
 
-  if (path === "/health") return Response.json({ ok: true, platform: "deno-deploy", version: "filter-v3", time: new Date().toISOString() });
+  if (path === "/health") return Response.json({ ok: true, platform: "deno-deploy", version: "filter-v4", time: new Date().toISOString() });
   return new Response("Not Found", { status: 404 });
 }
 
