@@ -6,7 +6,7 @@
   "deploy": {
     "runtime": {
       "type": "dynamic",
-      "entrypoint": "./deno_main_v7.ts",
+      "entrypoint": "./deno_main_v8.ts",
       "memory_limit": 768
     }
   }
