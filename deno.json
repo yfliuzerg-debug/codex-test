@@ -1,12 +1,13 @@
 {
   "imports": {
-    "xlsx": "npm:xlsx@0.18.5"
+    "xlsx": "npm:xlsx@0.18.5",
+    "./netlify/functions/_shared/engine.mts": "./engine_signed_patch.mts"
   },
   "nodeModulesDir": "auto",
   "deploy": {
     "runtime": {
       "type": "dynamic",
-      "entrypoint": "./deno_main_v8.ts",
+      "entrypoint": "./deno_main_v9.ts",
       "memory_limit": 768
     }
   }
