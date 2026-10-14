@@ -194,7 +194,6 @@ export async function analyzeFiles(args: {
 
   let names = [...new Set(so.map((r) => r.name))];
   if (focus.length) names = names.filter((v) => focus.some((q) => base.norm(v).includes(base.norm(q))));
-  else names = names.slice(0, 30);
 
   const matrix: any[] = [];
   const exportRows: any[] = [];
