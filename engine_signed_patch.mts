@@ -98,8 +98,21 @@ function applyGpr55(rate: number | null, r: any) {
 }
 
 function targetRate(cp: any, r: any, rs: any[], tts: any[], mm: string) {
-  const rate = cpRateFromTTS(cp, tts) ?? mechRate(cp, r) ?? skuRate(rs, r.sku, mm);
-  return applyGpr55(rate, r);
+  const ttsRate = cpRateFromTTS(cp, tts);
+  const mechanismRate = mechRate(cp, r);
+  const skuBaseRate = skuRate(rs, r.sku, mm);
+  const isGprSku =
+    GPR_55_CUSTOMERS.has(base.norm(r.name)) &&
+    (base.norm(r.s2) === base.norm("Senior Blue") || base.norm(r.s2) === base.norm("Senior Green"));
+
+  if (isGprSku) {
+    const grossRate = mechanismRate ?? skuBaseRate;
+    if (grossRate != null) return applyGpr55(grossRate, r);
+    // Existing TTS Disc.Rate is already the post-GPR executable rate (e.g. 9.5%), so do not deduct twice.
+    return ttsRate;
+  }
+
+  return ttsRate ?? mechanismRate ?? skuBaseRate;
 }
 
 function ttsScopeOK(p: any, r: any) {
