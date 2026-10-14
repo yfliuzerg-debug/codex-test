@@ -84,8 +84,22 @@ function cpRateFromTTS(cp: any, tts: any[]) {
   return u.length === 1 ? u[0] : null;
 }
 
+const GPR_55_CUSTOMERS = new Set([
+  base.norm("天虹数科商业股份有限公司"),
+  base.norm("东莞市糖酒集团东方配销有限公司"),
+]);
+
+function applyGpr55(rate: number | null, r: any) {
+  if (rate == null) return null;
+  const customerOK = GPR_55_CUSTOMERS.has(base.norm(r.name));
+  const segment = base.norm(r.s2);
+  const skuOK = segment === base.norm("Senior Blue") || segment === base.norm("Senior Green");
+  return customerOK && skuOK ? Math.max(0, rate - 0.055) : rate;
+}
+
 function targetRate(cp: any, r: any, rs: any[], tts: any[], mm: string) {
-  return cpRateFromTTS(cp, tts) ?? mechRate(cp, r) ?? skuRate(rs, r.sku, mm);
+  const rate = cpRateFromTTS(cp, tts) ?? mechRate(cp, r) ?? skuRate(rs, r.sku, mm);
+  return applyGpr55(rate, r);
 }
 
 function ttsScopeOK(p: any, r: any) {
